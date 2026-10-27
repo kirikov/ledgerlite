@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 
-from . import service
+from datetime import date
+
+from . import export, service
 from .db import init_db
 
 app = Flask(__name__)
@@ -24,3 +26,15 @@ def index():
 @app.get("/expenses/total")
 def total():
     return jsonify({"owner": request.args["owner"], "total_cents": service.total_cents(request.args["owner"])})
+
+
+@app.get("/expenses/export")
+def export_csv():
+    if request.args.get("token") != export.EXPORT_TOKEN:
+        return jsonify({"error": "forbidden"}), 403
+    owner = request.args["owner"]
+    category = request.args.get("category")
+    since = date.fromisoformat(request.args["since"]) if request.args.get("since") else None
+    rows = export.rows_for_export(owner, category, since)
+    path = export.write_export_file(owner, export.to_csv(rows))
+    return jsonify({"rows": len(rows), "file": path, "monthly": export.monthly_totals(rows)})
